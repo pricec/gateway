@@ -2,61 +2,76 @@ package session
 
 import (
 	"context"
+	"fmt"
 	"net/http"
-	"time"
+	"sync"
 
-	"github.com/google/uuid"
 	"github.com/pricec/golib/log"
 )
 
-type SessionMessage struct {
-	uuid      uuid.UUID `json:"uuid"`
-	senderId  uuid.UUID `json:"sender_id"`
-	timestamp time.Time `json:"timestamp"`
-	data      []byte    `json:"data"`
+type SessionTable struct {
+	rw sync.RWMutex
+	sessions map[SessionId]*Session
 }
 
 type SessionManager struct {
 	ctx context.Context
 	cancel context.CancelFunc
-	readCb func(SessionMessage)
+	readCb func(SessionId, []byte)
+	sessionTable SessionTable
 }
 
-// Returns a new SessionManager. Note that requestType should
-// be precisely the type expected, NOT a pointer to a variable
-// of that type.
+// Returns a new SessionManager. The readCb function
+// will be invoked once for each message received. The
+// first argument (id) will be the SessionId of the session;
+// when calling the Write function, pass this Id to
+// respond to the original caller.
 func NewSessionManager(
 	ctx context.Context,
-	readCb func(SessionMessage),
+	readCb func(SessionId, []byte),
 ) (*SessionManager, error) {
 	smCtx, cancel := context.WithCancel(ctx)
 	sm := &SessionManager{
 		ctx: smCtx,
 		cancel: cancel,
 		readCb: readCb,
+		sessionTable: SessionTable{
+			rw: sync.RWMutex{},
+			sessions: make(map[SessionId]*Session),
+		},
 	}
 	return sm, nil
 }
 
-func (s *SessionManager) Start() error {
-	return nil
+// Send the argument object to the argument session. The
+// object will be serialized as JSON and sent to the client,
+// if they exist. Any error encountered will be returned.
+func (s *SessionManager) Write(id SessionId, v interface{}) error {
+	s.sessionTable.rw.RLock()
+	defer s.sessionTable.rw.RUnlock()
+	if sess, ok := s.sessionTable.sessions[id]; !ok {
+		return fmt.Errorf("No session with ID %v", id)
+	} else {
+		return sess.Write(v)
+	}
 }
 
-func (s *SessionManager) Stop() error {
-	return nil
-}
-
-func (s *SessionManager) Write(uuid uuid.UUID, v interface{}) error {
-	return nil
-}
-
+// TODO: This function is not really thread safe, but it
+//       is if you make the following two assumptions.
+//
+//   1. We will never add a session with the same Id twice
+//   2. We will never iterate the session table
 func (s *SessionManager) add(session *Session) error {
 	log.Debug("Adding session %v", session.Desc())
+	s.sessionTable.sessions[session.Id()] = session
 	return nil
 }
 
 func (s *SessionManager) remove(session *Session) error {
 	log.Debug("Removing session %v", session.Desc())
+	s.sessionTable.rw.Lock()
+	defer s.sessionTable.rw.Unlock()
+	delete(s.sessionTable.sessions, session.Id())
 	return nil
 }
 
@@ -76,6 +91,9 @@ func (s *SessionManager) Open(w http.ResponseWriter, r *http.Request) {
 	s.handleRequests(session)
 }
 
+// This function handles incoming messages from the client.
+// For each message received, the read callback is invoked
+// with the SessionId and the data sent by the client.
 func (s *SessionManager) handleRequests(session *Session) {
 	for {
 		_, msg, err := session.ReadMessageContext(s.ctx)
@@ -87,13 +105,7 @@ func (s *SessionManager) handleRequests(session *Session) {
 		if s.readCb == nil {
 			log.Warning("Session manager read callback is not initialized")
 		} else {
-			s.readCb(SessionMessage{
-				uuid: uuid.New(),
-				senderId: session.Id(),
-				timestamp: time.Now().UTC(),
-				data: msg,
-			})
+			s.readCb(session.Id(), msg)
 		}
 	}
 }
-

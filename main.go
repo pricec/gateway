@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/pricec/golib/log"
 	"github.com/pricec/gateway/session"
@@ -38,6 +37,10 @@ func sigHandler(
 			}
 		}
 	}()
+}
+
+func ReadCb (id session.SessionId, data []byte) {
+	log.Info("Received message from %v: %+v", id, data)
 }
 
 func main() {
@@ -86,45 +89,4 @@ func main() {
 
 	log.Info("Gateway exiting")
 	log.Flush()
-}
-
-func ReadCb(message session.SessionMessage) {
-	log.Info("Received message %+v", message)
-}
-
-type RequestMessage struct {
-	URI string `json:"uri"`
-}
-
-func open(w http.ResponseWriter, r *http.Request) {
-	session, err := session.NewSession(w, r)
-	if err != nil {
-		log.Warning("Failed to establish connection: %v", err)
-		return
-	}
-
-	handleRequests(session)
-	session.Close()
-}
-
-func handleRequests(sess *session.Session) {
-	for {
-		// TODO: Timeout on read?
-		req := &RequestMessage{}
-		if err := sess.ReadTimeout(10 * time.Second, req); err != nil {
-			switch err.(type) {
-			case session.ReadTimeoutError:
-			default:
-				log.Warning(
-					"(%v) Failed to read message: %v",
-					sess.Desc(),
-					err,
-				)
-				return
-			}
-		} else {
-			sess.Write(req)
-			log.Info("%+v", req)
-		}
-	}
 }

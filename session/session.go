@@ -11,6 +11,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type SessionId uuid.UUID
+
 // TODO: Check request origin (prevent CSRF)
 var upgrader = websocket.Upgrader{
 	HandshakeTimeout: 3 * time.Second,
@@ -20,7 +22,7 @@ var upgrader = websocket.Upgrader{
 }
 
 type Session struct {
-	uuid       uuid.UUID
+	id         SessionId
 	remoteAddr string
 	connection *websocket.Conn
 }
@@ -32,7 +34,7 @@ func NewSession(w http.ResponseWriter, r *http.Request) (*Session, error) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err == nil {
 		session = &Session{
-			uuid: uuid.New(),
+			id: SessionId(uuid.New()),
 			remoteAddr: r.RemoteAddr,
 			connection: conn,
 		}
@@ -46,9 +48,9 @@ func (s *Session) Close() {
 	s.connection.Close()
 }
 
-// Returns the UUID identifying this session
-func (s *Session) Id() uuid.UUID {
-	return s.uuid
+// Returns the Id identifying this session
+func (s *Session) Id() SessionId {
+	return s.id
 }
 
 // Returns a description of the session. At present,
