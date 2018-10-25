@@ -1,0 +1,12 @@
+package: github.com/pricec/gateway
+import:
+- package: github.com/Shopify/sarama
+  version: ^1.19.0
+- package: github.com/google/uuid
+  version: ^1.0.0
+- package: github.com/gorilla/websocket
+  version: ^1.4.0
+- package: github.com/pricec/golib
+  repo: ssh://git@github.com/pricec/golib.git
+  subpackages:
+  - log
