@@ -9,6 +9,7 @@ import (
 
 	"github.com/pricec/golib/log"
 	"github.com/pricec/gateway/session"
+	"github.com/pricec/gateway/kafka"
 )
 
 func sigHandler(
@@ -39,13 +40,19 @@ func sigHandler(
 	}()
 }
 
-func ReadCb (id session.SessionId, data []byte) {
-	log.Info("Received message from %v: %+v", id, data)
+func ReadCb(km *kafka.KafkaManager) func(id session.SessionId, data []byte) {
+	return func(id session.SessionId, data []byte) {
+		log.Info("Received message from %v: %+v", id, data)
+		if err := km.Send("test", data); err != nil {
+			log.Err("Failed to send message to kafka: %v", err)
+		}
+	}
 }
 
 func main() {
 	// Set up logging
 	log.SetLevel(log.LL_DEBUG)
+	defer log.Flush()
 	log.Info("Starting gateway...")
 
 	// Variable declarations
@@ -58,13 +65,19 @@ func main() {
 	sigHandler(ctx, &wantExit, doneChan, sigChan)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
-	// Initialize the session manager
-	sm, err := session.NewSessionManager(ctx, ReadCb)
+	// Initialize the Kafka manager
+	km, err := kafka.NewKafkaManager(ctx, "kafka.common", uint16(9092))
 	if err != nil {
-		log.Crit("Failed to create session manager: %v", err)
-		os.Exit(-1)
+		log.Crit("Failed to connect to kafka: %v", err)
+		return
 	}
 
+	// Initialize the session manager
+	sm, err := session.NewSessionManager(ctx, ReadCb(km))
+	if err != nil {
+		log.Crit("Failed to create session manager: %v", err)
+		return
+	}
 	// Initialize the HTTP server
 	httpServer := &http.Server{ Addr: ":8080" }
 	http.HandleFunc("/open", sm.Open)
@@ -88,5 +101,4 @@ func main() {
 	}
 
 	log.Info("Gateway exiting")
-	log.Flush()
 }
