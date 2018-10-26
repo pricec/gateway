@@ -7,9 +7,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/pricec/golib/kafka"
 	"github.com/pricec/golib/log"
 	"github.com/pricec/gateway/session"
-	"github.com/pricec/gateway/kafka"
 )
 
 func sigHandler(
