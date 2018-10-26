@@ -12,22 +12,53 @@ import (
 	message "github.com/pricec/protobuf/go/socket-gateway"
 )
 
-func ReadCb(
+func responseCb(s *session.SessionManager) func([]byte) {
+	return func(data []byte) {
+		resp := &message.Response{}
+		if err := proto.Unmarshal(data, resp); err != nil {
+			log.Notice("Received bad response message '%v': %v", data, err)
+			return
+		} else {
+			log.Debug("Received response message: %+v", resp)
+		}
+
+		idStr := resp.GetClientId()
+		if id, err := session.NewSessionId(idStr); err != nil {
+			log.Notice(
+				"Received message for nonexistent client '%v': %v",
+				idStr,
+				err,
+			)
+			return
+		} else {
+			s.Write(id, data)
+		}
+	}
+}
+
+func requestCb(
 	km *kafka.KafkaManager,
 ) func(*session.SessionManager, session.SessionId, []byte) {
 
 	return func(s *session.SessionManager, id session.SessionId, data []byte) {
 		req := &message.Request{}
 		if err := proto.Unmarshal(data, req); err != nil {
-			log.Notice("Received bad message '%v' from %v: %v", data, id, err)
+			log.Notice(
+				"Received bad request message '%v' from %v: %v",
+				data,
+				id,
+				err,
+			)
 			// TODO: send a message indicating the failure
 			return
 		} else {
-			log.Debug("Received message from %v: %+v", id, req)
+			log.Debug("Received request message from %v: %+v", id, req)
 			req.ClientId = id.String()
 		}
 
-		if err := km.Send("test", data); err != nil {
+		if out, err := proto.Marshal(req); err != nil {
+			log.Err("Failed to marshal modified request: %v", err)
+		} else if err := km.Send("test_request", out); err != nil {
 			log.Err("Failed to send message '%v' to kafka: %v", data, err)
 			// TODO: send a message indicating the failure
 		}
@@ -55,11 +86,18 @@ func main() {
 	}
 
 	// Initialize the session manager
-	sm, err := session.NewSessionManager(ctx, ReadCb(km))
+	sm, err := session.NewSessionManager(ctx, requestCb(km))
 	if err != nil {
 		log.Crit("Failed to create session manager: %v", err)
 		return
 	}
+
+	// Set up Kafka consumer for responses
+	if err := km.ConsumeTopic("test_response", responseCb(sm)); err != nil {
+		log.Crit("Failed to set up response consumer")
+		return
+	}
+
 	// Initialize the HTTP server
 	httpServer := &http.Server{ Addr: ":8080" }
 	http.HandleFunc("/health", healthCheck)

@@ -17,6 +17,11 @@ func (s SessionId) String() string {
 	return uuid.UUID(s).String()
 }
 
+func NewSessionId(s string) (SessionId, error) {
+	result, err := uuid.Parse(s)
+	return SessionId(result), err
+}
+
 // TODO: Check request origin (prevent CSRF)
 var upgrader = websocket.Upgrader{
 	HandshakeTimeout: 3 * time.Second,
@@ -68,8 +73,8 @@ func (s *Session) Desc() string {
 // of the session. Note that the argument message
 // will be serialized to JSON, and the serialized
 // JSON will be sent on the wire.
-func (s *Session) Write(v interface{}) error {
-	return s.connection.WriteJSON(v)
+func (s *Session) Write(data []byte) error {
+	return s.connection.WriteMessage(1, data)
 }
 
 // Reads the next message from the session. This

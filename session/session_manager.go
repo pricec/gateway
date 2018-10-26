@@ -46,13 +46,13 @@ func NewSessionManager(
 // Send the argument object to the argument session. The
 // object will be serialized as JSON and sent to the client,
 // if they exist. Any error encountered will be returned.
-func (s *SessionManager) Write(id SessionId, v interface{}) error {
+func (s *SessionManager) Write(id SessionId, data []byte) error {
 	s.sessionTable.rw.RLock()
 	defer s.sessionTable.rw.RUnlock()
 	if sess, ok := s.sessionTable.sessions[id]; !ok {
 		return fmt.Errorf("No session with ID %v", id)
 	} else {
-		return sess.Write(v)
+		return sess.Write(data)
 	}
 }
 
