@@ -17,7 +17,7 @@ type SessionTable struct {
 type SessionManager struct {
 	ctx context.Context
 	cancel context.CancelFunc
-	readCb func(SessionId, []byte)
+	readCb func(*SessionManager, SessionId, []byte)
 	sessionTable SessionTable
 }
 
@@ -28,7 +28,7 @@ type SessionManager struct {
 // respond to the original caller.
 func NewSessionManager(
 	ctx context.Context,
-	readCb func(SessionId, []byte),
+	readCb func(*SessionManager, SessionId, []byte),
 ) (*SessionManager, error) {
 	smCtx, cancel := context.WithCancel(ctx)
 	sm := &SessionManager{
@@ -105,7 +105,7 @@ func (s *SessionManager) handleRequests(session *Session) {
 		if s.readCb == nil {
 			log.Warning("Session manager read callback is not initialized")
 		} else {
-			s.readCb(session.Id(), msg)
+			s.readCb(s, session.Id(), msg)
 		}
 	}
 }

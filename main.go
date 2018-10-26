@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/google/uuid"
 	"github.com/pricec/golib/kafka"
 	"github.com/pricec/golib/log"
 	"github.com/pricec/gateway/session"
@@ -40,11 +41,22 @@ func sigHandler(
 	}()
 }
 
-func ReadCb(km *kafka.KafkaManager) func(id session.SessionId, data []byte) {
-	return func(id session.SessionId, data []byte) {
-		log.Info("Received message from %v: %+v", id, data)
-		if err := km.Send("test", data); err != nil {
-			log.Err("Failed to send message to kafka: %v", err)
+type AckMessage struct {
+	Id      string `json:"id"`
+	Message []byte `json:"message"`
+}
+
+func ReadCb(
+	km *kafka.KafkaManager,
+) func(*session.SessionManager, session.SessionId, []byte) {
+	return func(s *session.SessionManager, id session.SessionId, data []byte) {
+		log.Debug("Received message from %v: %+v", id, data)
+		ack := AckMessage{ Id: uuid.New().String(), Message: data }
+		if err := s.Write(id, ack); err != nil {
+			log.Warning("Failed to ack message '%v': %v", data, err)
+		} else if err := km.Send("test", data); err != nil {
+			log.Err("Failed to send message '%v' to kafka: %v", data, err)
+			// TODO: send a message indicating the failure
 		}
 	}
 }
