@@ -15,4 +15,4 @@
 vendor/
 
 # Package lock (let Jenkins manage this)
-Gopkg.lock
+glide.lock
