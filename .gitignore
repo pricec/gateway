@@ -16,3 +16,7 @@ vendor/
 
 # Package lock (let Jenkins manage this)
 glide.lock
+
+# binaries
+gateway
+client/client
