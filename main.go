@@ -57,6 +57,7 @@ func main() {
 
 	// Variable declarations
 	wantExit := false
+	ready := false
 	ctx, cancel := context.WithCancel(context.Background())
 	sigChan := make (chan os.Signal)
 	doneChan := make(chan struct{})
@@ -80,6 +81,8 @@ func main() {
 	}
 	// Initialize the HTTP server
 	httpServer := &http.Server{ Addr: ":8080" }
+	http.HandleFunc("/health", healthCheck)
+	http.HandleFunc("/ready", readinessCheck(&ready))
 	http.HandleFunc("/open", sm.Open)
 
 	go func() {
@@ -90,8 +93,9 @@ func main() {
 
 	for !wantExit {
 		log.Info("Initializing gateway")
-
+		ready = true
 		<- doneChan
+		ready = false
 	}
 	cancel()
 
@@ -101,4 +105,18 @@ func main() {
 	}
 
 	log.Info("Gateway exiting")
+}
+
+func healthCheck(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "", http.StatusOK)
+}
+
+func readinessCheck(ready *bool) func(http.ResponseWriter, *http.Request) {
+	return func (w http.ResponseWriter, r *http.Request) {
+		if *ready {
+			http.Error(w, "", http.StatusOK)
+		} else {
+			http.Error(w, "", http.StatusServiceUnavailable)
+		}
+	}
 }
