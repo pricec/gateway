@@ -4,17 +4,29 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/pricec/golib/kafka"
 	"github.com/pricec/golib/log"
 	"github.com/pricec/golib/signal"
 	"github.com/pricec/gateway/session"
+	message "github.com/pricec/protobuf/go/socket-gateway"
 )
 
 func ReadCb(
 	km *kafka.KafkaManager,
 ) func(*session.SessionManager, session.SessionId, []byte) {
+
 	return func(s *session.SessionManager, id session.SessionId, data []byte) {
-		log.Debug("Received message from %v: %+v", id, data)
+		req := &message.Request{}
+		if err := proto.Unmarshal(data, req); err != nil {
+			log.Notice("Received bad message '%v' from %v: %v", data, id, err)
+			// TODO: send a message indicating the failure
+			return
+		} else {
+			log.Debug("Received message from %v: %+v", id, req)
+			req.ClientId = id.String()
+		}
+
 		if err := km.Send("test", data); err != nil {
 			log.Err("Failed to send message '%v' to kafka: %v", data, err)
 			// TODO: send a message indicating the failure

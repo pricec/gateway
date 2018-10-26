@@ -13,6 +13,10 @@ import (
 
 type SessionId uuid.UUID
 
+func (s SessionId) String() string {
+	return uuid.UUID(s).String()
+}
+
 // TODO: Check request origin (prevent CSRF)
 var upgrader = websocket.Upgrader{
 	HandshakeTimeout: 3 * time.Second,

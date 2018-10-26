@@ -1,5 +1,9 @@
 package: github.com/pricec/gateway
 import:
+- package: github.com/golang/protobuf
+  version: ^1.2.0
+  subpackages:
+  - proto
 - package: github.com/google/uuid
   version: ^1.0.0
 - package: github.com/gorilla/websocket
@@ -9,3 +13,8 @@ import:
   subpackages:
   - kafka
   - log
+  - signal
+- package: github.com/pricec/protobuf
+  repo: ssh://git@github.com/pricec/protobuf.git
+  subpackages:
+  - go/socket-gateway
