@@ -21,8 +21,8 @@ func main() {
 
 	req := &message.EchoRequest{
 		Version: uint32(1),
-		Type: "echo",
-		Id: 1,
+		Type: message.RequestType_ECHO,
+		Id: uint32(1),
 		Data: "1234",
 	}
 
@@ -34,5 +34,19 @@ func main() {
 
 	if err := conn.WriteMessage(1, out); err != nil {
 		log.Err("Failed to send message: %v", err)
+		return
+	}
+
+	_, p, err := conn.ReadMessage()
+	if err != nil {
+		log.Notice("Failed to read message: %v", err)
+		return
+	}
+
+	resp := &message.EchoResponse{}
+	if err := proto.Unmarshal(p, resp); err != nil {
+		log.Err("Error unmarhsaling response: %v", err)
+	} else {
+		log.Notice("Received response %v", resp)
 	}
 }
