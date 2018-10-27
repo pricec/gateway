@@ -24,11 +24,11 @@ func main() {
 	var data = flag.String("data", "test", "Message to send")
 	flag.Parse()
 
-	req := &message.EchoRequest{
+	req := &message.HttpRequest{
 		Version: uint32(1),
 		Type: message.RequestType_ECHO,
 		Id: uint32(1),
-		Data: *data,
+		Uri: "http://www.google.com",
 	}
 
 	out, err := proto.Marshal(req)

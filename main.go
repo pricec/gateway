@@ -52,6 +52,13 @@ func decodeRequest(data []byte, id session.SessionId) (proto.Message, error) {
 		}
 		request.ClientId = id.String()
 		return request, nil
+	case message.RequestType_HTTP:
+		request := &message.HttpRequest{}
+		if err := proto.Unmarshal(data, request); err != nil {
+			return nil, fmt.Errorf("Error unmarshaling request: %v", err)
+		}
+		request.ClientId = id.String()
+		return request, nil
 	default:
 		return nil, fmt.Errorf("Unrecognized request type %v", reqType)
 	}
