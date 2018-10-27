@@ -5,5 +5,6 @@ buildGoDocker(
     containerName: 'socket_gateway',
     deploymentNamespace: 'common',
     deploymentName: 'sockgateway',
-    deploymentContainerName: 'sockgateway'
+    deploymentContainerName: 'sockgateway',
+    testbedRepo: 'ssh://git@github.com/pricec/gateway-test'
 )
