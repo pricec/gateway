@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/websocket"
 	"github.com/pricec/golib/log"
@@ -19,11 +21,14 @@ func main() {
 	}
 	defer conn.Close()
 
+	var data = flag.String("data", "test", "Message to send")
+	flag.Parse()
+
 	req := &message.EchoRequest{
 		Version: uint32(1),
 		Type: message.RequestType_ECHO,
 		Id: uint32(1),
-		Data: "1234",
+		Data: *data,
 	}
 
 	out, err := proto.Marshal(req)
