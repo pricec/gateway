@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/golang/protobuf/proto"
@@ -36,31 +37,40 @@ func responseCb(s *session.SessionManager) func([]byte) {
 	}
 }
 
+func decodeRequest(data []byte, id session.SessionId) (proto.Message, error) {
+	req := &message.Request{}
+	if err := proto.Unmarshal(data, req); err != nil {
+		return nil, fmt.Errorf("Error unmarshaling request: %v", err)
+	}
+
+	reqType := req.GetType()
+	switch reqType {
+	case message.RequestType_ECHO:
+		request := &message.EchoRequest{}
+		if err := proto.Unmarshal(data, request); err != nil {
+			return nil, fmt.Errorf("Error unmarshaling request: %v", err)
+		}
+		request.ClientId = id.String()
+		return request, nil
+	default:
+		return nil, fmt.Errorf("Unrecognized request type %v", reqType)
+	}
+}
+
 func requestCb(
 	km *kafka.KafkaManager,
 ) func(*session.SessionManager, session.SessionId, []byte) {
-
 	return func(s *session.SessionManager, id session.SessionId, data []byte) {
-		req := &message.Request{}
-		if err := proto.Unmarshal(data, req); err != nil {
-			log.Notice(
-				"Received bad request message '%v' from %v: %v",
-				data,
-				id,
-				err,
-			)
-			// TODO: send a message indicating the failure
-			return
+		req, err := decodeRequest(data, id)
+		if err != nil {
+			log.Err("Failed to decode request for %v: %v", id, err)
 		} else {
-			log.Debug("Received request message from %v: %+v", id, req)
-			req.ClientId = id.String()
-		}
-
-		if out, err := proto.Marshal(req); err != nil {
-			log.Err("Failed to marshal modified request: %v", err)
-		} else if err := km.Send("test_request", out); err != nil {
-			log.Err("Failed to send message '%v' to kafka: %v", data, err)
-			// TODO: send a message indicating the failure
+			if out, err := proto.Marshal(req); err != nil {
+				log.Err("Failed to marshal modified request: %v", err)
+			} else if err := km.Send("test_request", out); err != nil {
+				log.Err("Failed to send message '%v' to kafka: %v", data, err)
+				// TODO: send a message indicating the failure
+			}
 		}
 	}
 }
