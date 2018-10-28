@@ -2,84 +2,28 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/pricec/gateway/session"
+	"github.com/pricec/golib/config"
 	"github.com/pricec/golib/kafka"
 	"github.com/pricec/golib/log"
 	"github.com/pricec/golib/signal"
-	"github.com/pricec/gateway/session"
-	message "github.com/pricec/protobuf/go/socket-gateway"
 )
 
-func responseCb(s *session.SessionManager) func([]byte) {
-	return func(data []byte) {
-		resp := &message.Response{}
-		if err := proto.Unmarshal(data, resp); err != nil {
-			log.Notice("Received bad response message '%v': %v", data, err)
-			return
-		} else {
-			log.Debug("Received response message: %+v", resp)
-		}
 
-		idStr := resp.GetClientId()
-		if id, err := session.NewSessionId(idStr); err != nil {
-			log.Notice(
-				"Received message for nonexistent client '%v': %v",
-				idStr,
-				err,
-			)
-			return
-		} else {
-			s.Write(id, data)
-		}
-	}
+type Config struct {
+	KafkaHost     string `yaml:"kafka_host,omitempty" env:"KAFKA_HOST"`
+	KafkaPort     uint16 `yaml:"kafka_port,omitempty" env:"KAFKA_PORT"`
+	RequestTopic  string `yaml:"request_topic,omitempty" env:"REQUEST_TOPIC"`
+	ResponseTopic string `yaml:"response_topic,omitempty" env:"RESPONSE_TOPIC"`
 }
 
-func decodeRequest(data []byte, id session.SessionId) (proto.Message, error) {
-	req := &message.Request{}
-	if err := proto.Unmarshal(data, req); err != nil {
-		return nil, fmt.Errorf("Error unmarshaling request: %v", err)
-	}
-
-	reqType := req.GetType()
-	switch reqType {
-	case message.RequestType_ECHO:
-		request := &message.EchoRequest{}
-		if err := proto.Unmarshal(data, request); err != nil {
-			return nil, fmt.Errorf("Error unmarshaling request: %v", err)
-		}
-		request.ClientId = id.String()
-		return request, nil
-	case message.RequestType_HTTP:
-		request := &message.HttpRequest{}
-		if err := proto.Unmarshal(data, request); err != nil {
-			return nil, fmt.Errorf("Error unmarshaling request: %v", err)
-		}
-		request.ClientId = id.String()
-		return request, nil
-	default:
-		return nil, fmt.Errorf("Unrecognized request type %v", reqType)
-	}
-}
-
-func requestCb(
-	km *kafka.KafkaManager,
-) func(*session.SessionManager, session.SessionId, []byte) {
-	return func(s *session.SessionManager, id session.SessionId, data []byte) {
-		req, err := decodeRequest(data, id)
-		if err != nil {
-			log.Err("Failed to decode request for %v: %v", id, err)
-		} else {
-			if out, err := proto.Marshal(req); err != nil {
-				log.Err("Failed to marshal modified request: %v", err)
-			} else if err := km.Send("test_request", out); err != nil {
-				log.Err("Failed to send message '%v' to kafka: %v", data, err)
-				// TODO: send a message indicating the failure
-			}
-		}
-	}
+var defaultConfig = Config{
+	KafkaHost: "kafka.common",
+	KafkaPort: uint16(9092),
+	RequestTopic: "test_request",
+	ResponseTopic: "test_response",
 }
 
 func main() {
@@ -87,6 +31,14 @@ func main() {
 	log.SetLevel(log.LL_DEBUG)
 	defer log.Flush()
 	log.Info("Starting gateway...")
+
+	// Config
+	cfg := defaultConfig
+	if err := config.ReadConfig(&cfg, "test.yaml"); err != nil {
+		log.Crit("Failed to initialize config: %v", err)
+		return
+	}
+	log.Info("Configuration: %+v", cfg)
 
 	// Variable declarations
 	ready := false
@@ -96,21 +48,21 @@ func main() {
 	done, reload := signal.Setup(ctx)
 
 	// Initialize the Kafka manager
-	km, err := kafka.NewKafkaManager(ctx, "kafka.common", uint16(9092))
+	km, err := kafka.NewKafkaManager(ctx, cfg.KafkaHost, cfg.KafkaPort)
 	if err != nil {
 		log.Crit("Failed to connect to kafka: %v", err)
 		return
 	}
 
 	// Initialize the session manager
-	sm, err := session.NewSessionManager(ctx, requestCb(km))
+	sm, err := session.NewSessionManager(ctx, requestCb(km, cfg.RequestTopic))
 	if err != nil {
 		log.Crit("Failed to create session manager: %v", err)
 		return
 	}
 
 	// Set up Kafka consumer for responses
-	if err := km.ConsumeTopic("test_response", responseCb(sm)); err != nil {
+	if err := km.ConsumeTopic(cfg.ResponseTopic, responseCb(sm)); err != nil {
 		log.Crit("Failed to set up response consumer")
 		return
 	}

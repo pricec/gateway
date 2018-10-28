@@ -14,7 +14,10 @@ import:
   - kafka
   - log
   - signal
+  - config
 - package: github.com/pricec/protobuf
   repo: ssh://git@github.com/pricec/protobuf.git
   subpackages:
   - go/socket-gateway
+- package: github.com/spf13/viper
+  version: ^1.2.1

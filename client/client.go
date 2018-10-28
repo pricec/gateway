@@ -21,14 +21,14 @@ func main() {
 	}
 	defer conn.Close()
 
-	var data = flag.String("data", "test", "Message to send")
+	var url = flag.String("url", "https://www.google.com", "URL to GET")
 	flag.Parse()
 
 	req := &message.HttpRequest{
 		Version: uint32(1),
-		Type: message.RequestType_ECHO,
+		Type: message.RequestType_HTTP,
 		Id: uint32(1),
-		Uri: "http://www.google.com",
+		Url: *url,
 	}
 
 	out, err := proto.Marshal(req)
@@ -48,7 +48,7 @@ func main() {
 		return
 	}
 
-	resp := &message.EchoResponse{}
+	resp := &message.HttpResponse{}
 	if err := proto.Unmarshal(p, resp); err != nil {
 		log.Err("Error unmarhsaling response: %v", err)
 	} else {
