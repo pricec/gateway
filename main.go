@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"net/http"
 
 	"github.com/pricec/gateway/session"
@@ -13,6 +14,7 @@ import (
 
 
 type Config struct {
+	LogLevel      uint8  `yaml:"log_level,omitempty" env:"LOG_LEVEL"`
 	KafkaHost     string `yaml:"kafka_host,omitempty" env:"KAFKA_HOST"`
 	KafkaPort     uint16 `yaml:"kafka_port,omitempty" env:"KAFKA_PORT"`
 	RequestTopic  string `yaml:"request_topic,omitempty" env:"REQUEST_TOPIC"`
@@ -20,6 +22,7 @@ type Config struct {
 }
 
 var defaultConfig = Config{
+	LogLevel: uint8(log.LL_INFO),
 	KafkaHost: "kafka.common",
 	KafkaPort: uint16(9092),
 	RequestTopic: "test_request",
@@ -27,18 +30,23 @@ var defaultConfig = Config{
 }
 
 func main() {
-	// Set up logging
-	log.SetLevel(log.LL_DEBUG)
 	defer log.Flush()
 	log.Info("Starting gateway...")
 
+	// Command line arguments
+	var cfgFile = flag.String("config-file", "", "Path to config")
+	flag.Parse()
+
 	// Config
 	cfg := defaultConfig
-	if err := config.ReadConfig(&cfg, "test.yaml"); err != nil {
+	if err := config.ReadConfig(&cfg, *cfgFile); err != nil {
 		log.Crit("Failed to initialize config: %v", err)
 		return
 	}
 	log.Info("Configuration: %+v", cfg)
+
+	// Set up logging
+	log.SetLevel(log.LogLevel(cfg.LogLevel))
 
 	// Variable declarations
 	ready := false
