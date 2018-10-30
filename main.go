@@ -22,7 +22,7 @@ type Config struct {
 }
 
 var defaultConfig = Config{
-	LogLevel: uint8(log.LL_INFO),
+	LogLevel: uint8(log.LL_DEBUG),
 	KafkaHost: "kafka.common",
 	KafkaPort: uint16(9092),
 	RequestTopic: "test_request",

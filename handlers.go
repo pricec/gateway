@@ -35,6 +35,9 @@ func responseCb(s *session.SessionManager) func([]byte) {
 }
 
 func decodeRequest(data []byte, id session.SessionId) (proto.Message, error) {
+	log.Debug("Bytes received: %+v", data)
+	log.Debug("String reveived: %v", string(data))
+
 	req := &message.Request{}
 	if err := proto.Unmarshal(data, req); err != nil {
 		return nil, fmt.Errorf("Error unmarshaling request: %v", err)
