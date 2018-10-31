@@ -51,6 +51,7 @@ func decodeRequest(data []byte, id session.SessionId) (proto.Message, error) {
 			return nil, fmt.Errorf("Error unmarshaling request: %v", err)
 		}
 		request.ClientId = id.String()
+		log.Debug("Unmarshaled request (with clientId): %v", request)
 		return request, nil
 	case message.RequestType_HTTP:
 		request := &message.HttpRequest{}
@@ -58,6 +59,7 @@ func decodeRequest(data []byte, id session.SessionId) (proto.Message, error) {
 			return nil, fmt.Errorf("Error unmarshaling request: %v", err)
 		}
 		request.ClientId = id.String()
+		log.Debug("Unmarshaled request (with clientId): %v", request)
 		return request, nil
 	default:
 		return nil, fmt.Errorf("Unrecognized request type %v", reqType)
@@ -78,6 +80,8 @@ func requestCb(
 			} else if err := km.Send(requestTopic, out); err != nil {
 				log.Err("Failed to send message '%v' to kafka: %v", data, err)
 				// TODO: send a message indicating the failure
+			} else {
+				log.Debug("Sent message %+v (bytes %v)", req, out)
 			}
 		}
 	}
